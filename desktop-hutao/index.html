@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+</head>
+<body style="font-family:sans-serif;padding:16px;">
+  <h2>🌸 桌面胡桃（會說話了）</h2>
+
+  <textarea id="text" rows="4" style="width:100%;">
+胡桃最喜歡陪你玩遊戲了唷～
+  </textarea>
+
+  <button id="btn">讓胡桃說話</button>
+
+  <audio id="audio" controls></audio>
+
+  <script>
+    document.getElementById("btn").onclick = async () => {
+      const text = document.getElementById("text").value;
+      const path = await window.hutao.speak(text);
+      const audio = document.getElementById("audio");
+      audio.src = path;
+      audio.play();
+    };
+  </script>
+</body>
+</html>

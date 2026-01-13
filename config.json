@@ -1,0 +1,99 @@
+{
+  "botName": "本堂主的左右護法",
+  "prefix": "/",
+  "channelPromo": "🤖 我是堂主的小助手，負責管理聊天室、防洗頻、偶爾嘴碎，也會提醒大家堂主的頻道喔",
+  "promoMessages": [
+    "大家好，我是堂主小助手~~",
+    "聊天室好熱鬧.w.",
+    "HiHI~記得看看堂主的 YouTube 頻道喔~~~~",
+    "不想錯過堂主的直播嗎？趕快去 YouTube 開啟小鈴鐺吧！🔔",
+    "聊天室好熱鬧，偷偷提醒一下～堂主的頻道不要錯過喔~~~ 😎",
+    " https://discord.com/channels/1389243584732987514/1442157811546062898 "
+  ],
+  "dailyReport": {
+    "enabled": true,
+    "hour": 22,
+    "minute": 30
+  },
+  "promoCooldownMinutes": 150,
+  "antiSpam": {
+    "enabled": true,
+    "maxMessages": 2,
+    "intervalSeconds": 2,
+    "warnCooldownSeconds": 5,
+    "action": "timeout",
+    "timeoutSeconds": 30,
+    "deleteSpamMessages": true,
+    "ignoredChannelIds": [],
+    "countSlashCommands": true,
+    "announceTimeout": true,
+    "announceCooldownSeconds": 12
+  },
+  "antiSpamEscalation": {
+    "enabled": true,
+    "baseTimeoutSeconds": 30,
+    "multiplier": 3,
+    "maxStage": 6,
+    "decayMinutes": 30,
+    "notifyAtStage": 4,
+    "notifyRoleId": "1432707210185801820"
+  },
+  "filters": {
+    "enabled": true,
+    "keywords": [
+      "幹你娘",
+      "你媽死",
+      "肏",
+      "靠北",
+      "死一死",
+      "操你媽",
+      "幹你媽",
+      "去死",
+      "刪除頻道",
+      "刪頻道"
+    ],
+    "ignoredChannelIds": [
+      "1435989077387378698",
+      "1446437214883020800"
+    ]
+  },
+  "roleControl": {
+    "adminRoles": [
+      "本堂主",
+      "扳扳",
+      "是機器人欸可以養嗎?"
+    ],
+    "protectedRoles": [
+      "本堂主",
+      "扳扳",
+      "是機器人欸可以養嗎?"
+    ]
+  },
+  "command": {
+    "deleteInvokerMessage": true
+  },
+  "slash": {
+    "enabled": true,
+    "clientId": "1458769741039665243",
+    "guildId": "1389243584732987514"
+  },
+  "log": {
+    "enabled": true,
+    "channelId": "1433819048671445083"
+  },
+  "cooldown": {
+    "aboutSeconds": 30
+  },
+  "aiHuTao": {
+  "enabled": true,
+  "allowedChannelIds": ["1459190545556570178"],
+  "requireMention": true,
+  "cooldownSeconds": 10
+  },
+  "relationship": {
+  "favoriteUserId": "1116718831801475082",
+  "favoriteDisplayName": "[Hu tao繼承人]~~",
+  "intimacyMode": "sweet", 
+  "intimacyAllowed": true
+  }
+}
