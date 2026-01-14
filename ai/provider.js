@@ -11,12 +11,19 @@ const openai = require("./providers/openai");
 const mistral = require("./providers/mistral");
 
 function getProviderName() {
-  return (process.env.AI_PROVIDER || (config.ai && config.ai.provider) || "openai").toLowerCase();
+  // env 優先，其次才吃 config.json
+  return (process.env.AI_PROVIDER || config.ai?.provider || "openai").toLowerCase();
 }
 
 
 async function chat({ system, user, temperature = 0.9 }) {
   const provider = getProviderName();
+  console.log("[AI] Selected provider =", provider);
+  console.log("[AI] ENV models:", {
+    MISTRAL_MODEL: process.env.MISTRAL_MODEL,
+    OPENAI_MODEL: process.env.OPENAI_MODEL,
+  });
+
 
   if (provider === "mistral") {
   const baseUrl =
