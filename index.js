@@ -1,3 +1,5 @@
+console.log("### BOOT VERSION: DC-BOT-CLEAN / MISTRAL DEBUG ###");
+
 // index.js
 const { Client, GatewayIntentBits } = require("discord.js");
 const fs = require("fs");
