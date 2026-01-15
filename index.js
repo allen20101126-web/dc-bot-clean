@@ -197,8 +197,8 @@ const scheduleDailyReport = () => {
 
 // ===== 胡桃主動冒泡（最愛用戶）=====
 const FAVORITE_USER_ID = process.env.FAVORITE_USER_ID || "1116718831801475082";
-const FAVORITE_PING_COOLDOWN_MIN = Number(process.env.FAVORITE_PING_COOLDOWN_MIN || 360); // 6 小時
-const FAVORITE_PING_CHANCE = Number(process.env.FAVORITE_PING_CHANCE || 0.15); // 15%
+const FAVORITE_PING_COOLDOWN_MIN = Number(process.env.FAVORITE_PING_COOLDOWN_MIN || 240); // 4 小時
+const FAVORITE_PING_CHANCE = Number(process.env.FAVORITE_PING_CHANCE || 0.25); // 25%
 let lastFavoritePingAt = 0;
 
 
