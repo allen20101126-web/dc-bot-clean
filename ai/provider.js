@@ -1,3 +1,4 @@
+console.log("[BOOT] AI_PROVIDER env =", process.env.AI_PROVIDER);
 console.log("========== AI PROVIDER DEBUG ==========");
 console.log("[ENV] AI_PROVIDER =", process.env.AI_PROVIDER);
 console.log("[ENV] MISTRAL_MODEL =", process.env.MISTRAL_MODEL);

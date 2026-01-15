@@ -1,7 +1,45 @@
 // ai/huTaoReply.js
 const persona = require("./persona");
 const memory = require("./memory");
-const openaiProvider = require("./providers/openai");
+const provider = require("./provider"); // ✅ 改：走統一入口
+
+function buildMessages({ userId, userText }) {
+  const history = memory.get(userId);
+  return [
+    { role: "system", content: persona.system },
+    ...history.map((x) => ({ role: x.role, content: x.content })),
+    { role: "user", content: userText },
+  ];
+}
+
+module.exports = async function huTaoReply(userText, userId = "global") {
+  const cleaned = String(userText || "").trim();
+  if (!cleaned) return "";
+
+  const clipped = cleaned.slice(0, 800);
+  const messages = buildMessages({ userId, userText: clipped });
+
+  memory.push(userId, "user", clipped);
+
+  // ✅ 把「messages」轉成 provider.chat 需要的 system/user 形式
+  const system = persona.system;
+  const user = [
+    ...memory.get(userId).map((x) => `${x.role}: ${x.content}`),
+    `user: ${clipped}`,
+  ].join("\n");
+
+  // ✅ 這行會走 ai/provider.js 裡的 openai / mistral 分支
+  const raw = await provider.chat({
+    system,
+    user,
+    temperature: 0.95,
+  });
+
+  if (raw) memory.push(userId, "assistant", raw);
+  if (Math.random() < 0.3) memory.save();
+
+  return persona.postProcess(raw);
+};
 
 // ⭐ 你的偏心設定（先寫死，最少改動）
 const FAVORITE_USER_ID = "1116718831801475082";
