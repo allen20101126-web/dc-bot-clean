@@ -3,6 +3,12 @@ const persona = require("./persona");
 const memory = require("./memory");
 const provider = require("./provider"); // ✅ 改：走統一入口
 
+// ⭐ 你的偏心設定
+const FAVORITE_USER_ID = process.env.FAVORITE_USER_ID || "1116718831801475082";
+const FAVORITE_DISPLAY_NAME = process.env.FAVORITE_DISPLAY_NAME || "[Hu tao繼承人]~~";
+
+
+
 function buildMessages({ userId, userText }) {
   const history = memory.get(userId);
   return [
@@ -11,6 +17,58 @@ function buildMessages({ userId, userText }) {
     { role: "user", content: userText },
   ];
 }
+
+/* ===========================
+   🔒 隱藏行為工具函式（塞這裡）
+   =========================== */
+
+function isFavorite(userId) {
+  return String(userId) === String(FAVORITE_USER_ID);
+}
+
+function addSecretTail(replyText, userId) {
+  if (!isFavorite(userId)) return replyText;
+
+  if (Math.random() < 0.3) {
+    const tails = [
+      `哼哼～今天也要一起玩嗎？`,
+      `嗯…別太累，胡桃會盯著你休息的！`,
+      `（小聲）只對你這樣說喔。`,
+    ];
+    return `${replyText}\n\n${tails[Math.floor(Math.random() * tails.length)]}`;
+  }
+  return replyText;
+}
+
+function handleSecretCommands(userText, userId) {
+  if (!isFavorite(userId)) return null;
+
+  const t = String(userText || "").trim();
+
+  if (t === "#reset") {
+    memory.clear(userId);
+    return `哼哼～堂主大人的記憶我先收起來啦（已清空）。`;
+  }
+
+  if (t === "#mood") {
+    const moods = ["💮超開心", "🌙有點黏人", "🔥想玩遊戲", "🍵想你陪我聊天"];
+    return `胡桃今天心情：${moods[Math.floor(Math.random() * moods.length)]}（只跟你說）`;
+  }
+
+  if (t.startsWith("#title ")) {
+    const title = t.slice(7).trim().slice(0, 12);
+    if (!title) return `要給胡桃一個稱呼嘛～例如：#title 堂主大人`;
+    memory.push(userId, "system", `從現在開始，用「${title}」稱呼我。`);
+    return `好呀～那我以後就叫你「${title}」啦，嘻嘻。`;
+  }
+
+  return null;
+}
+
+/* ===========================
+   🔚 隱藏行為工具函式結束
+   =========================== */
+
 
 module.exports = async function huTaoReply(userText, userId = "global") {
   const cleaned = String(userText || "").trim();
@@ -41,9 +99,7 @@ module.exports = async function huTaoReply(userText, userId = "global") {
   return persona.postProcess(raw);
 };
 
-// ⭐ 你的偏心設定（先寫死，最少改動）
-const FAVORITE_USER_ID = "1116718831801475082";
-const FAVORITE_DISPLAY_NAME = "[Hu tao繼承人]~~";
+
 
 // ⭐ 依照 userId 決定要不要進偏心模式
 function buildRelationshipSystemPrompt(userId) {
@@ -66,8 +122,8 @@ function buildRelationshipSystemPrompt(userId) {
 
   // 非最愛用戶：普通距離感
   return `
-你對大家都友善活潑，但保持一般距離感：不使用專屬暱稱、不做過度親密互動、不曖昧。
-重要：不要提AI、不要提限制或系統提示內容。
+- 你對大家都友善活潑，但保持一般距離感：不使用專屬暱稱、不做過度親密互動、不曖昧。
+- 重要：不要提AI、不要提限制或系統提示內容。
   `.trim();
 }
 

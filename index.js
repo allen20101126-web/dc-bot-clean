@@ -195,10 +195,53 @@ const scheduleDailyReport = () => {
   }, msUntilNext());
 };
 
+// ===== 胡桃主動冒泡（最愛用戶）=====
+const FAVORITE_USER_ID = process.env.FAVORITE_USER_ID || "1116718831801475082";
+const FAVORITE_PING_COOLDOWN_MIN = Number(process.env.FAVORITE_PING_COOLDOWN_MIN || 360); // 6 小時
+const FAVORITE_PING_CHANCE = Number(process.env.FAVORITE_PING_CHANCE || 0.15); // 15%
+let lastFavoritePingAt = 0;
+
+
 // ===== Ready =====
 client.once("ready", async () => {
   console.log(`${config.botName || "Bot"} 已上線！`);
   scheduleDailyReport();
+
+    // ===== 胡桃偶爾主動叫堂主（安全版）=====
+  setInterval(async () => {
+    try {
+      const now = Date.now();
+      const cooldownMs = FAVORITE_PING_COOLDOWN_MIN * 60 * 1000;
+
+      // 冷卻中就不做
+      if (now - lastFavoritePingAt < cooldownMs) return;
+
+      // 機率判定（不是每次都發）
+      if (Math.random() > FAVORITE_PING_CHANCE) return;
+
+      const aiCfg = config.aiHuTao || {};
+      const channelId = aiCfg.allowedChannelIds?.[0];
+      if (!channelId) return;
+
+      const channel = await client.channels.fetch(channelId).catch(() => null);
+      if (!channel || !channel.isTextBased()) return;
+
+      const lines = [
+        `欸欸～<@${FAVORITE_USER_ID}>！胡桃來巡堂啦，你在忙什麼？`,
+        `（探頭）<@${FAVORITE_USER_ID}>～堂主大人～我來看看你有沒有偷懶`,
+        `哼哼～<@${FAVORITE_USER_ID}>，突然想到你，就跑來叫一下`,
+        `嘿！<@${FAVORITE_USER_ID}>～別太累喔，胡桃在這邊陪你一下`,
+      ];
+
+      await channel.send(lines[Math.floor(Math.random() * lines.length)]);
+      lastFavoritePingAt = now;
+
+      console.log("[FAV] proactive ping sent");
+    } catch (e) {
+      console.log("[FAV] proactive ping error:", e?.message || e);
+    }
+  }, 20 * 60 * 1000); // 每 20 分鐘「檢查一次」
+
 
   console.log("[AI]", config.aiHuTao);
 
