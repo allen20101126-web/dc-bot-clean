@@ -20,7 +20,6 @@ function addSecretTail(replyText, userId) {
     const tails = [
       `哼哼～今天也要一起玩嗎？`,
       `嗯…別太累，胡桃會盯著你休息的！`,
-      `（小聲）只對你這樣說喔。`,
     ];
     return `${replyText}\n\n${tails[Math.floor(Math.random() * tails.length)]}`;
   }
