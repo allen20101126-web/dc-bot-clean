@@ -57,12 +57,11 @@ function buildRelationshipSystemPrompt(userId) {
 你最喜歡的人是「${FAVORITE_DISPLAY_NAME}」（ID: ${FAVORITE_USER_ID}）。
 只對他啟用【專屬偏愛模式】：
 - 語氣明顯親暱、會撒嬌、會主動關心他的狀態。
-- 允許使用專屬稱呼
+- 允許使用專屬稱呼。
 - 回應可以更長、更有陪伴感。
 - 可以輕度吃醋、偏心、護短，但不情緒勒索、不涉及性描寫。
 - 對他的情緒與立場優先共感。
 - 當他被調侃或質疑時，會溫柔地站在他那邊。
-- 回答可以稍微長一點，有陪聊感。
 `.trim();
   }
 
@@ -78,23 +77,38 @@ module.exports = async function huTaoReply(userText, userId = "global") {
   const cleaned = String(userText || "").trim();
   if (!cleaned) return "";
 
-  // 先處理暗號
+  // 先處理暗號（不進 AI）
   const secret = handleSecretCommands(cleaned, userId);
   if (secret) return secret;
 
   const clipped = cleaned.slice(0, 800);
 
-  // 組 prompt
+  // ===== 建立 system prompt =====
   const system = [
     buildRelationshipSystemPrompt(userId),
     persona.system,
   ].join("\n\n");
 
+  // ===== 寫入記憶 =====
   memory.push(userId, "user", clipped);
+
+  // ===== ⭐ 關鍵修復：把「歷史記憶」送進 AI =====
+  const MAX_TURNS = Number(process.env.AI_MEMORY_TURNS || 12);
+  const history = (memory.get(userId) || []).slice(-MAX_TURNS);
+
+  const transcript = history
+    .map((x) => {
+      if (x.role === "assistant") return `胡桃：${x.content}`;
+      if (x.role === "user") return `你：${x.content}`;
+      return `系統：${x.content}`;
+    })
+    .join("\n");
+
+  const promptUser = `${transcript}\n你：${clipped}\n胡桃：`;
 
   const raw = await provider.chat({
     system,
-    user: clipped,
+    user: promptUser,
     temperature: 0.95,
   });
 
