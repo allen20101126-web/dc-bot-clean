@@ -4,6 +4,10 @@ console.log("### BOOT VERSION: DC-BOT-CLEAN / MISTRAL DEBUG ###");
 const { Client, GatewayIntentBits } = require("discord.js");
 const fs = require("fs");
 
+const provider = require("./ai/provider");
+const persona = require("./ai/persona");
+
+
 // HuTao AI
 const huTaoReply = require("./ai/huTaoReply");
 
@@ -17,6 +21,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildPresences,
   ],
 });
 
@@ -197,9 +202,55 @@ const scheduleDailyReport = () => {
 
 // ===== 胡桃主動冒泡（最愛用戶）=====
 const FAVORITE_USER_ID = process.env.FAVORITE_USER_ID || "1116718831801475082";
-const FAVORITE_PING_COOLDOWN_MIN = Number(process.env.FAVORITE_PING_COOLDOWN_MIN || 240); // 4 小時
+const FAVORITE_PING_COOLDOWN_MIN = Number(process.env.FAVORITE_PING_COOLDOWN_MIN || 180); // 3 小時
 const FAVORITE_PING_CHANCE = Number(process.env.FAVORITE_PING_CHANCE || 0.25); // 25%
 let lastFavoritePingAt = 0;
+
+
+// ===== 判斷堂主是否在線 =====
+async function isFavoriteOnline() {
+  try {
+    for (const guild of client.guilds.cache.values()) {
+      const member = await guild.members.fetch(FAVORITE_USER_ID).catch(() => null);
+      if (!member) continue;
+
+      const status = member.presence?.status;
+      console.log("[PRESENCE CHECK]", status);
+      return status && status !== "offline";
+    }
+    return false;
+  } catch (e) {
+    console.log("[PRESENCE CHECK] error", e?.message || e);
+    return false;
+  }
+}
+
+// ===== 用 AI 生成主動冒泡句 =====
+async function generateProactivePingText() {
+  const system = [
+    persona.system,
+    "你現在要主動叫最重要的人回來聊天。",
+    "語氣要像胡桃，俏皮、可愛、自然。",
+    "限制：只輸出一句話，15~40字，不要提AI、不提系統、不做現實承諾。"
+  ].join("\n");
+
+  const raw = await provider.chat({
+    system,
+    user: "現在請主動叫他一下。",
+    temperature: 0.9,
+  });
+
+  return (
+    String(raw || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 80)
+    || "（探頭）我剛剛想到你啦～過來一下嘛！"
+  );
+}
+
+
+
 
 
 // ===== Ready =====
@@ -207,40 +258,37 @@ client.once("ready", async () => {
   console.log(`${config.botName || "Bot"} 已上線！`);
   scheduleDailyReport();
 
-    // ===== 胡桃偶爾主動叫堂主（安全版）=====
-  setInterval(async () => {
-    try {
-      const now = Date.now();
-      const cooldownMs = FAVORITE_PING_COOLDOWN_MIN * 60 * 1000;
+    // ===== 胡桃只在堂主在線時，主動冒泡（AI 生成）=====
+setInterval(async () => {
+  try {
+    const now = Date.now();
+    const cooldownMs = FAVORITE_PING_COOLDOWN_MIN * 60 * 1000;
 
-      // 冷卻中就不做
-      if (now - lastFavoritePingAt < cooldownMs) return;
+    if (now - lastFavoritePingAt < cooldownMs) return;
+    if (Math.random() > FAVORITE_PING_CHANCE) return;
 
-      // 機率判定（不是每次都發）
-      if (Math.random() > FAVORITE_PING_CHANCE) return;
+    // ✅ 只在你在線時
+    const online = await isFavoriteOnline();
+    if (!online) return;
 
-      const aiCfg = config.aiHuTao || {};
-      const channelId = aiCfg.allowedChannelIds?.[0];
-      if (!channelId) return;
+    const aiCfg = config.aiHuTao || {};
+    const channelId = aiCfg.allowedChannelIds?.[0];
+    if (!channelId) return;
 
-      const channel = await client.channels.fetch(channelId).catch(() => null);
-      if (!channel || !channel.isTextBased()) return;
+    const channel = await client.channels.fetch(channelId).catch(() => null);
+    if (!channel || !channel.isTextBased()) return;
 
-      const lines = [
-        `欸欸～<@${FAVORITE_USER_ID}>！胡桃來巡堂啦，你在忙什麼？`,
-        `（探頭）<@${FAVORITE_USER_ID}>～堂主大人～我來看看你有沒有偷懶`,
-        `哼哼～<@${FAVORITE_USER_ID}>，突然想到你，就跑來叫一下`,
-        `嘿！<@${FAVORITE_USER_ID}>～別太累喔，胡桃在這邊陪你一下`,
-      ];
+    // ✅ AI 生一句
+    const aiLine = await generateProactivePingText();
 
-      await channel.send(lines[Math.floor(Math.random() * lines.length)]);
-      lastFavoritePingAt = now;
+    await channel.send(`<@${FAVORITE_USER_ID}> ${aiLine}`);
+    lastFavoritePingAt = now;
 
-      console.log("[FAV] proactive ping sent");
-    } catch (e) {
-      console.log("[FAV] proactive ping error:", e?.message || e);
-    }
-  }, 20 * 60 * 1000); // 每 20 分鐘「檢查一次」
+    console.log("[FAV] proactive AI ping sent (online-only)");
+  } catch (e) {
+    console.log("[FAV] proactive AI ping error:", e?.message || e);
+  }
+}, 15 * 60 * 1000); // 每 15 分鐘檢查一次
 
 
   console.log("[AI]", config.aiHuTao);
