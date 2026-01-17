@@ -376,6 +376,10 @@ client.on("messageCreate", async (message) => {
 
         const mp3 = await ttsOpenAI(reply || "哼哼～我在喔！");
         await speakMp3Bytes(message.member, mp3);
+        console.log("[VOICE] enabled=", VOICE_ENABLED, "onlyFav=", VOICE_ONLY_FAVORITE);
+        console.log("[VOICE] user in VC?", !!message.member?.voice?.channel);
+        console.log("[VOICE] reply length=", String(reply || "").length);
+
       } catch (e) {
         console.log("[VOICE] speak error:", e?.message || e);
       }
