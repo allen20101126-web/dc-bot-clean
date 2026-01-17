@@ -1,3 +1,5 @@
+process.env.FFMPEG_PATH = require("ffmpeg-static");
+
 console.log("### BOOT VERSION: DC-BOT-CLEAN / VOICE + MEMORY DEBUG ###");
 
 // index.js
@@ -12,8 +14,8 @@ const provider = require("./ai/provider");
 const persona = require("./ai/persona");
 
 // Voice (TTS -> VC)
-const { speakMp3Bytes } = require("./voice/voiceManager");
-const { ttsOpenAI } = require("./voice/ttsOpenAI");
+const { speakAudioBytes, leaveGuild } = require("./voice/voiceManager");
+const { ttsPiper } = require("./voice/ttsPiper");
 
 // 讀取 config.json
 let config = JSON.parse(fs.readFileSync("./config.json", "utf8"));
@@ -374,8 +376,8 @@ client.on("messageCreate", async (message) => {
 
         if (!message.member?.voice?.channel) return;
 
-        const mp3 = await ttsOpenAI(reply || "哼哼～我在喔！");
-        await speakMp3Bytes(message.member, mp3);
+        const wav = await ttsPiper(reply || "哼哼～我在喔！");
+        await speakAudioBytes(message.member, wav);
         console.log("[VOICE] enabled=", VOICE_ENABLED, "onlyFav=", VOICE_ONLY_FAVORITE);
         console.log("[VOICE] user in VC?", !!message.member?.voice?.channel);
         console.log("[VOICE] reply length=", String(reply || "").length);

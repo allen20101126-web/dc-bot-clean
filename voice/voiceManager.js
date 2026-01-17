@@ -43,7 +43,6 @@ async function getOrJoin(member) {
     session = { connection, player };
     sessions.set(guildId, session);
 
-    // 等連上
     await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
 
     connection.on("stateChange", (oldS, newS) => {
@@ -70,30 +69,29 @@ async function getOrJoin(member) {
 }
 
 // member: GuildMember
-// mp3Bytes: Buffer
-async function speakMp3Bytes(member, mp3Bytes) {
+// audioBytes: Buffer (mp3 或 wav 都行)
+async function speakAudioBytes(member, audioBytes) {
   const session = await getOrJoin(member);
 
-  if (!Buffer.isBuffer(mp3Bytes)) {
-    throw new Error("mp3Bytes must be a Buffer");
+  if (!Buffer.isBuffer(audioBytes)) {
+    throw new Error("audioBytes must be a Buffer");
   }
+  if (!audioBytes.length) return;
 
-  const stream = bufferToReadable(mp3Bytes);
+  const stream = bufferToReadable(audioBytes);
 
-  // 注意：我們是 MP3
+  // StreamType.Arbitrary：讓 prism/ffmpeg 自己判斷/轉碼
   const resource = createAudioResource(stream, {
     inputType: StreamType.Arbitrary,
     inlineVolume: true,
   });
 
-  // 音量可調
   try {
     resource.volume.setVolume(1.0);
   } catch {}
 
   session.player.play(resource);
 
-  // 等播完（或閒置）
   await entersState(session.player, AudioPlayerStatus.Playing, 10_000).catch(() => {});
   await entersState(session.player, AudioPlayerStatus.Idle, 60_000).catch(() => {});
 }
@@ -113,4 +111,4 @@ async function leaveGuild(guildId) {
   sessions.delete(guildId);
 }
 
-module.exports = { speakMp3Bytes, leaveGuild };
+module.exports = { speakAudioBytes, leaveGuild };
