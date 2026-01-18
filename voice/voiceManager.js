@@ -111,4 +111,32 @@ async function leaveGuild(guildId) {
   sessions.delete(guildId);
 }
 
+// member: GuildMember
+// wavBytes: Buffer
+async function speakWavBytes(member, wavBytes) {
+  const session = await getOrJoin(member);
+
+  if (!Buffer.isBuffer(wavBytes)) {
+    throw new Error("wavBytes must be a Buffer");
+  }
+
+  const stream = bufferToReadable(wavBytes);
+
+  // WAV 也用 Arbitrary（需要 ffmpeg 才能穩）
+  const resource = createAudioResource(stream, {
+    inputType: StreamType.Arbitrary,
+    inlineVolume: true,
+  });
+
+  try {
+    resource.volume.setVolume(1.0);
+  } catch {}
+
+  session.player.play(resource);
+
+  await entersState(session.player, AudioPlayerStatus.Playing, 10_000).catch(() => {});
+  await entersState(session.player, AudioPlayerStatus.Idle, 60_000).catch(() => {});
+}
+
+
 module.exports = { speakAudioBytes, leaveGuild };

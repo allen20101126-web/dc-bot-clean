@@ -1,49 +1,60 @@
 // voice/ttsPiper.js
 const { spawn } = require("child_process");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
+
+const DEFAULT_PIPER_EXE = "C:\\piper\\piper.exe";
+const DEFAULT_MODEL = "C:\\piper\\en_US-amy-medium.onnx";
+const DEFAULT_CONFIG = "C:\\piper\\en_US-amy-medium.onnx.json";
+
+function ensureDir(p) {
+  try {
+    fs.mkdirSync(p, { recursive: true });
+  } catch {}
+}
 
 function safeText(t) {
   return String(t || "")
     .replace(/\r/g, " ")
-    .replace(/\n+/g, " ")
+    .replace(/\n/g, " ")
     .trim()
-    .slice(0, 300); // 你可以調長，但先保守
+    .slice(0, 280); // Piper 太長也會慢，先保守一點
 }
 
-/**
- * 需要環境變數：
- * - PIPER_BIN: piper 可執行檔路徑（預設 "piper"）
- * - PIPER_MODEL: 模型 .onnx 路徑（必填）
- * 可選：
- * - PIPER_SPEAKER: 多說話人模型用（數字）
- * - PIPER_RATE: 語速(文字越大越慢/或看模型)，先不強制
- */
 async function ttsPiper(text) {
-  const bin = process.env.PIPER_BIN || "piper";
-  const model = process.env.PIPER_MODEL;
-  if (!model) throw new Error("Missing PIPER_MODEL (path to .onnx)");
+  const piperExe = process.env.PIPER_EXE || DEFAULT_PIPER_EXE;
+  const modelPath = process.env.PIPER_MODEL || DEFAULT_MODEL;
+  const configPath = process.env.PIPER_CONFIG || DEFAULT_CONFIG;
 
-  const speaker = (process.env.PIPER_SPEAKER || "").trim(); // optional
-  const input = safeText(text);
-  if (!input) return Buffer.alloc(0);
+  if (!fs.existsSync(piperExe)) throw new Error(`Piper exe not found: ${piperExe}`);
+  if (!fs.existsSync(modelPath)) throw new Error(`Piper model not found: ${modelPath}`);
+  if (!fs.existsSync(configPath)) throw new Error(`Piper config not found: ${configPath}`);
 
-  const outFile = path.join(os.tmpdir(), `piper_${Date.now()}_${Math.random().toString(16).slice(2)}.wav`);
+  const outDir = path.join(process.cwd(), "voice", "tmp");
+  ensureDir(outDir);
 
-  const args = ["--model", model, "--output_file", outFile];
-  if (speaker) args.push("--speaker", speaker);
+  const outWav = path.join(outDir, `piper_${Date.now()}_${Math.random().toString(16).slice(2)}.wav`);
+  const input = safeText(text) || "Hello.";
+
+  const args = ["-m", modelPath, "-c", configPath, "-f", outWav];
 
   await new Promise((resolve, reject) => {
-    const p = spawn(bin, args, { stdio: ["pipe", "pipe", "pipe"] });
+    const p = spawn(piperExe, args, { stdio: ["pipe", "pipe", "pipe"] });
 
-    let errBuf = "";
+    let stderr = "";
+    let stdout = "";
+
+    p.stdout.on("data", (d) => (stdout += d.toString()));
+    p.stderr.on("data", (d) => (stderr += d.toString()));
+
+    // 把文字餵給 piper stdin
+    p.stdin.write(input, "utf8");
+    p.stdin.end();
+
     const killTimer = setTimeout(() => {
       try { p.kill("SIGKILL"); } catch {}
       reject(new Error("Piper TTS timeout"));
-    }, 30_000);
-
-    p.stderr.on("data", (d) => (errBuf += d.toString()));
+    }, 25_000);
 
     p.on("error", (e) => {
       clearTimeout(killTimer);
@@ -53,20 +64,19 @@ async function ttsPiper(text) {
     p.on("close", (code) => {
       clearTimeout(killTimer);
       if (code !== 0) {
-        reject(new Error(`Piper exited ${code}: ${errBuf.slice(0, 500)}`));
-      } else {
-        resolve();
+        return reject(new Error(`Piper exit=${code}\nSTDERR:\n${stderr}\nSTDOUT:\n${stdout}`));
       }
+      resolve();
     });
-
-    // 把文字丟給 piper stdin
-    p.stdin.write(input, "utf8");
-    p.stdin.end();
   });
 
-  const wav = fs.readFileSync(outFile);
-  try { fs.unlinkSync(outFile); } catch {}
-  return wav;
+  if (!fs.existsSync(outWav)) throw new Error("Piper finished but wav not created");
+
+  const buf = fs.readFileSync(outWav);
+  // 清掉暫存
+  try { fs.unlinkSync(outWav); } catch {}
+
+  return buf; // WAV bytes
 }
 
 module.exports = { ttsPiper };

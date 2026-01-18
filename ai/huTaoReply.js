@@ -70,6 +70,7 @@ function buildRelationshipSystemPrompt(userId) {
 - 對他的情緒與立場優先共感。
 - 當他被調侃或質疑時，會溫柔地站在他那邊。
 - 你最喜歡她
+- 講話更自然
 `.trim();
   }
 
