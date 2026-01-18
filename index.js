@@ -588,8 +588,271 @@ client.on("messageCreate", async (message) => {
 // =================================================
 // ================= interactionCreate ==============
 // =================================================
-// 你已經修好 slash 這塊了，就沿用你目前那份 interactionCreate（不要動也可以）
-// 我這裡不重貼，避免把你已經好的又弄壞。
+const EPHEMERAL = 1 << 6;
+
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  console.log("[INT] got interaction:", interaction.commandName);
+
+  // ✅ 先 defer，避免 3 秒超時 -> 「該申請未受回應」
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ flags: EPHEMERAL });
+    }
+  } catch (e) {
+    console.log("[INT] defer error:", e?.message || e);
+    return;
+  }
+
+  // ✅ 安全回覆：已 defer 就 editReply
+  const respond = async (text) => {
+    try {
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply(text);
+      } else {
+        await interaction.reply({ content: text, flags: EPHEMERAL });
+      }
+    } catch {}
+  };
+
+  // ✅ 讀 memory（有就用，沒有就略過）
+  let huTaoMemory = null;
+  try {
+    huTaoMemory = require("./ai/memory");
+  } catch {}
+
+  try {
+    const guild = interaction.guild;
+    if (!guild) return;
+
+    const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+
+    // --- Slash 也算洗頻（含 /about /hutao 等）---
+    if (config.antiSpam?.enabled && config.antiSpam.countSlashCommands) {
+      const ignored = config.antiSpam.ignoredChannelIds || [];
+      if (!ignored.includes(interaction.channelId)) {
+        const uid = interaction.user.id;
+
+        if (!client.spamState) client.spamState = {};
+        if (!client.spamState[uid])
+          client.spamState[uid] = { times: [], lastWarn: 0, lastAction: 0, lastAnnounce: 0 };
+
+        const state = client.spamState[uid];
+        const nowTs = Date.now();
+
+        state.times.push(nowTs);
+        const windowMs = (config.antiSpam.intervalSeconds || 4) * 1000;
+        state.times = state.times.filter((t) => nowTs - t < windowMs);
+
+        const maxMsg = config.antiSpam.maxMessages || 4;
+
+        if (state.times.length > maxMsg) {
+          const warnCdMs = (config.antiSpam.warnCooldownSeconds || 8) * 1000;
+
+          if (nowTs - state.lastWarn > warnCdMs) {
+            await respond("⚠️ 你操作太快了，先冷靜一下！");
+            state.lastWarn = nowTs;
+          }
+
+          const actionCdMs = 10 * 1000;
+          if (nowTs - state.lastAction > actionCdMs) {
+            const seconds = computeEscalatedTimeoutSeconds(uid);
+            const strikes = spamStrike[uid]?.strikes || 0;
+
+            if (member?.moderatable && !isAdmin(member) && !isProtected(member)) {
+              await member.timeout(seconds * 1000, `Anti-spam (slash): /${interaction.commandName}`).catch(() => {});
+              await logAction(`⛔ Anti-spam(slash)：${interaction.user.tag} timeout ${seconds}s（strike=${strikes}）`);
+              await maybeNotifyAdmins(interaction.channel, interaction.user.tag, `<@${uid}>`, seconds, strikes);
+
+              const annCdMs = (config.antiSpam.announceCooldownSeconds || 12) * 1000;
+              if (nowTs - state.lastAnnounce > annCdMs) {
+                await announceTimeout(interaction.channel, `<@${uid}>`, seconds, strikes);
+                state.lastAnnounce = nowTs;
+              }
+            }
+
+            state.lastAction = nowTs;
+          }
+
+          state.times = [];
+          return;
+        }
+      }
+    }
+
+    // =========================
+    // ========= /about =========
+    // =========================
+    if (interaction.commandName === "about") {
+      const cdMs = (config.cooldown?.aboutSeconds ?? 30) * 1000;
+      const now = Date.now();
+      const last = aboutCooldown.get(interaction.user.id) || 0;
+
+      if (now - last < cdMs) {
+        const left = Math.ceil((cdMs - (now - last)) / 1000);
+        await respond(`⏳ /about 冷卻中，請 ${left} 秒後再試。`);
+        return;
+      }
+
+      aboutCooldown.set(interaction.user.id, now);
+      await respond(`🤖 ${config.botName}\n${config.channelPromo}`);
+      return;
+    }
+
+    // =========================
+    // ========= /hutao =========
+    // =========================
+    if (interaction.commandName === "hutao") {
+      if (!member || !isAdmin(member)) {
+        await respond("❌ 你沒有權限使用這個指令。");
+        return;
+      }
+
+      const sub = interaction.options.getSubcommand();
+      if (!config.aiHuTao) config.aiHuTao = {};
+      if (!Array.isArray(config.aiHuTao.allowedChannelIds)) config.aiHuTao.allowedChannelIds = [];
+
+      if (sub === "status") {
+        const text =
+`🔥【胡桃 AI 狀態】
+- enabled：${config.aiHuTao.enabled ? "開" : "關"}
+- requireMention：${config.aiHuTao.requireMention ? "要@" : "不用@"}
+- cooldownSeconds：${config.aiHuTao.cooldownSeconds ?? 10}
+- allowedChannels：${(config.aiHuTao.allowedChannelIds || []).length
+  ? (config.aiHuTao.allowedChannelIds.map(id => `<#${id}>`).join(" "))
+  : "（尚未設定）"}
+
+📝 小提醒：
+- 只會在 allowedChannels 回覆
+- requireMention=true 時，必須 @ 機器人它才回`;
+        await respond(text);
+        return;
+      }
+
+      if (sub === "on") {
+        config.aiHuTao.enabled = true;
+        ensureDefaults();
+        const ok = saveConfig();
+        await respond(ok ? "✅ 已開啟胡桃 AI" : "⚠️ 已開啟胡桃 AI，但寫回 config.json 失敗（看終端/Logs）");
+        await logAction(`🤖 ${interaction.user.tag} hutao on`);
+        return;
+      }
+
+      if (sub === "off") {
+        config.aiHuTao.enabled = false;
+        ensureDefaults();
+        const ok = saveConfig();
+        await respond(ok ? "✅ 已關閉胡桃 AI" : "⚠️ 已關閉胡桃 AI，但寫回 config.json 失敗（看終端/Logs）");
+        await logAction(`🤖 ${interaction.user.tag} hutao off`);
+        return;
+      }
+
+      if (sub === "channel_add") {
+        const ch = interaction.options.getChannel("channel", true);
+        const id = ch.id;
+        if (!config.aiHuTao.allowedChannelIds.includes(id)) config.aiHuTao.allowedChannelIds.push(id);
+
+        ensureDefaults();
+        const ok = saveConfig();
+        await respond(ok ? `✅ 已加入允許頻道：<#${id}>` : `⚠️ 已加入允許頻道：<#${id}>，但寫回 config.json 失敗`);
+        await logAction(`🤖 ${interaction.user.tag} hutao channel_add ${id}`);
+        return;
+      }
+
+      if (sub === "channel_remove") {
+        const ch = interaction.options.getChannel("channel", true);
+        const id = ch.id;
+        config.aiHuTao.allowedChannelIds = (config.aiHuTao.allowedChannelIds || []).filter(x => x !== id);
+
+        ensureDefaults();
+        const ok = saveConfig();
+        await respond(ok ? `✅ 已移除允許頻道：<#${id}>` : `⚠️ 已移除允許頻道：<#${id}>，但寫回 config.json 失敗`);
+        await logAction(`🤖 ${interaction.user.tag} hutao channel_remove ${id}`);
+        return;
+      }
+
+      if (sub === "requiremention") {
+        const enabled = interaction.options.getBoolean("enabled", true);
+        config.aiHuTao.requireMention = !!enabled;
+
+        ensureDefaults();
+        const ok = saveConfig();
+        await respond(
+          ok
+            ? `✅ requireMention 已設為：${enabled ? "true（要@才回）" : "false（不用@也會回，但仍限允許頻道）"}`
+            : "⚠️ 已更新 requireMention，但寫回 config.json 失敗"
+        );
+        await logAction(`🤖 ${interaction.user.tag} hutao requiremention=${enabled}`);
+        return;
+      }
+
+      if (sub === "cooldown") {
+        const seconds = interaction.options.getInteger("seconds", true);
+        config.aiHuTao.cooldownSeconds = Math.min(Math.max(seconds, 1), 120);
+
+        ensureDefaults();
+        const ok = saveConfig();
+        await respond(ok ? `✅ cooldownSeconds 已設為：${config.aiHuTao.cooldownSeconds}s` : "⚠️ 寫回 config.json 失敗");
+        await logAction(`🤖 ${interaction.user.tag} hutao cooldown=${config.aiHuTao.cooldownSeconds}`);
+        return;
+      }
+
+      if (sub === "reset") {
+        const user = interaction.options.getUser("user", true);
+
+        if (!huTaoMemory || typeof huTaoMemory.clear !== "function") {
+          await respond("⚠️ 你還沒加 ai/memory.js（或 memory.js 沒有 clear 方法）。");
+          return;
+        }
+
+        huTaoMemory.clear(user.id);
+        await respond(`✅ 已清除 ${user.tag} 的胡桃記憶`);
+        await logAction(`🤖 ${interaction.user.tag} hutao reset ${user.tag}`);
+        return;
+      }
+
+      await respond("（未知的 hutao subcommand）");
+      return;
+    }
+
+    // ===========================
+    // ========= /status ==========
+    // ===========================
+    if (interaction.commandName === "status") {
+      if (!member || !isAdmin(member)) {
+        await respond("❌ 你沒有權限使用這個指令。");
+        return;
+      }
+      await respond("✅ Bot 正常運作中");
+      await logAction(`📊 ${interaction.user.tag} status`);
+      return;
+    }
+
+    // ===========================
+    // ========= /clear ===========
+    // ===========================
+    if (interaction.commandName === "clear") {
+      if (!member || !isAdmin(member)) {
+        await respond("❌ 你沒有權限使用這個指令。");
+        return;
+      }
+      const amount = Math.min(Math.max(interaction.options.getInteger("amount", true), 1), 100);
+      await interaction.channel.bulkDelete(amount, true).catch(async () => {
+        await respond("❌ 刪除失敗（訊息可能太舊或權限不足）。");
+        return;
+      });
+      await respond(`✅ 已刪除 ${amount} 則訊息`);
+      await logAction(`🧹 ${interaction.user.tag} clear ${amount} in #${interaction.channel?.name}`);
+      return;
+    }
+
+    await respond("（這個指令我還沒接好）");
+  } catch (err) {
+    console.error("interactionCreate error:", err);
+    await respond("❌ 發生錯誤，請看終端機/Logs。");
+  }
+});
 
 // ===== 崩潰保護 =====
 process.on("unhandledRejection", async (reason) => {
