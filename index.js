@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 process.env.FFMPEG_PATH = require("ffmpeg-static");
 
 console.log("### BOOT VERSION: DC-BOT-CLEAN / VOICE + MEMORY DEBUG ###");
