@@ -1,8 +1,9 @@
+// voice/ttsPiper.js (desktop + railway)
 const { spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
-const PIPER_HOME = process.env.PIPER_HOME || "/app/piper";
+const PIPER_HOME = process.env.PIPER_HOME || path.join(process.cwd(), "piper");
 
 function mustExist(p, label) {
   if (!fs.existsSync(p)) throw new Error(`${label} not found: ${p}`);
@@ -10,18 +11,27 @@ function mustExist(p, label) {
 }
 
 async function ttsPiper(text) {
-  const bin = mustExist(path.join(PIPER_HOME, "piper"), "Piper bin"); // ✅ 注意：沒有 .exe
-  const model = mustExist(path.join(PIPER_HOME, "model.onnx"), "Piper model");
-  const config = mustExist(path.join(PIPER_HOME, "model.onnx.json"), "Piper config");
+  // Railway(Linux) 會是 ./piper/piper
+  // Windows 會是 ./piper/piper.exe（你也可以用 env 覆蓋）
+  const bin =
+    fs.existsSync(path.join(PIPER_HOME, "piper.exe"))
+      ? path.join(PIPER_HOME, "piper.exe")
+      : path.join(PIPER_HOME, "piper");
+
+  mustExist(bin, "Piper bin");
+
+  const model = mustExist(path.join(PIPER_HOME, "en_US-amy-medium.onnx"), "Piper model");
+  const config = mustExist(path.join(PIPER_HOME, "en_US-amy-medium.onnx.json"), "Piper config");
 
   const input = String(text || "").trim().slice(0, 300);
   if (!input) return Buffer.alloc(0);
 
-  const outPath = path.join(PIPER_HOME, `out_${Date.now()}.wav`);
+  const outPath = path.join(PIPER_HOME, `out-${Date.now()}.wav`);
 
   return await new Promise((resolve, reject) => {
     const child = spawn(bin, ["-m", model, "-c", config, "-f", outPath], {
       cwd: PIPER_HOME,
+      windowsHide: true,
     });
 
     let err = "";
