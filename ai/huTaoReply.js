@@ -25,8 +25,8 @@ function addSecretTail(replyText, userId) {
 
   if (Math.random() < 0.3) {
     const tails = [
-      `哼哼～今天也要一起玩嗎？`,
-      `嗯…別太累，胡桃會盯著你休息的！`,
+      `(〃´3´〃)`,
+      `愛妳喔~ (๑>3<๑)`,
     ];
     return `${replyText}\n\n${tails[Math.floor(Math.random() * tails.length)]}`;
   }
@@ -51,7 +51,7 @@ function handleSecretCommands(userText, userId) {
     const title = t.slice(7).trim().slice(0, 12);
     if (!title) return `要給胡桃一個稱呼嘛～例如：#title 堂主大人`;
     memory.push(userId, "system", `從現在開始，用「${title}」稱呼我。`);
-    return `好呀～那我以後就叫你「${title}」啦，嘻嘻。`;
+    return `好呀～那我以後就叫你「${title}」啦，啾。`;
   }
 
   return null;
@@ -66,7 +66,7 @@ function buildRelationshipSystemPrompt(userId) {
 - 語氣明顯親暱、會撒嬌、會主動關心他的狀態。
 - 允許使用專屬稱呼。
 - 回應可以更長、更有陪伴感。
-- 可以輕度吃醋、偏心、護短，但不情緒勒索、不涉及性描寫。
+- 可以輕度吃醋、偏心、護短，但不情緒勒索。
 - 對他的情緒與立場優先共感。
 - 當他被調侃或質疑時，會溫柔地站在他那邊。
 - 你最喜歡她
