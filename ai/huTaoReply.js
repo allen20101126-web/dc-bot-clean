@@ -44,7 +44,7 @@ function handleSecretCommands(userText, userId) {
 
   if (t === "#mood") {
     const moods = ["💮超開心", "🌙有點黏人", "🔥想玩遊戲", "🍵想你陪我聊天"];
-    return `胡桃今天心情：${moods[Math.floor(Math.random() * moods.length)]}（只跟你說）`;
+    return `胡桃今天心情：${moods[Math.floor(Math.random() * moods.length)]}（啾咪愛你喔~）`;
   }
 
   if (t.startsWith("#title ")) {
