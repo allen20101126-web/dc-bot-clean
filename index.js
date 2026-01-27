@@ -43,8 +43,8 @@ const VOICE_ENABLED = String(process.env.VOICE_ENABLED || "1") === "1";
 const VOICE_ONLY_FAVORITE = String(process.env.VOICE_ONLY_FAVORITE || "1") === "1";
 
 // ===== 主動冒泡參數 =====
-const FAVORITE_PING_COOLDOWN_MIN = Number(process.env.FAVORITE_PING_COOLDOWN_MIN || 180);
-const FAVORITE_PING_CHANCE = Number(process.env.FAVORITE_PING_CHANCE || 0.25);
+const FAVORITE_PING_COOLDOWN_MIN = Number(process.env.FAVORITE_PING_COOLDOWN_MIN || 300);
+const FAVORITE_PING_CHANCE = Number(process.env.FAVORITE_PING_CHANCE || 0.3);
 let lastFavoritePingAt = 0;
 
 // Discord Client
